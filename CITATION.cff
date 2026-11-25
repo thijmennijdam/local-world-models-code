@@ -1,0 +1,39 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite the paper below."
+title: "Local World Models for Articulated Object Manipulation"
+type: software
+license: MIT
+authors:
+  - family-names: Nijdam
+    given-names: Thijmen
+  - family-names: Zhobro
+    given-names: Mikel
+  - family-names: Gumbsch
+    given-names: Christian
+  - family-names: Aljundi
+    given-names: Rahaf
+  - family-names: Gavves
+    given-names: Stratis
+  - family-names: Zadaianchuk
+    given-names: Andrii
+repository-code: "https://github.com/thijmennijdam/local-world-models-code"
+url: "https://thijmennijdam.github.io/local-world-models/"
+# TODO: arXiv identifier of the extended version
+preferred-citation:
+  type: conference-paper
+  title: "Local World Models for Articulated Object Manipulation"
+  authors:
+    - family-names: Nijdam
+      given-names: Thijmen
+    - family-names: Zhobro
+      given-names: Mikel
+    - family-names: Gumbsch
+      given-names: Christian
+    - family-names: Aljundi
+      given-names: Rahaf
+    - family-names: Gavves
+      given-names: Stratis
+    - family-names: Zadaianchuk
+      given-names: Andrii
+  collection-title: "RSS 2026 Workshop on Robot World Models"
+  year: 2026

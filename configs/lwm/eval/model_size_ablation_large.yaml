@@ -1,0 +1,62 @@
+# @package _global_
+
+# Disable Hydra's automatic output directory creation
+hydra:
+  output_subdir: null
+  run:
+    dir: .
+
+# Checkpoints: one run directory per model under $LWM_CKPT_DIR (flat layout: <run>/best.ckpt,
+# <run>/.hydra/config.yaml, <run>/episode_splits.json). LWM-100M_d1024_L8 and LWM-200M_d1024_L16
+# are the released paper models (HF lwm-checkpoints); the other names are the scaling-ablation
+# checkpoints (see README, "Data and checkpoints").
+checkpoint_paths:
+  - ${oc.env:LWM_CKPT_DIR}/00.02.59_lwm_v8_d512_L8_lr=1e-3_with_new_configs_large/best.ckpt
+  - ${oc.env:LWM_CKPT_DIR}/LWM-100M_d1024_L8/best.ckpt
+  - ${oc.env:LWM_CKPT_DIR}/10.05.08_lwm_v8_d1024_L16_lr=6e-5_with_new_configs_large/best.ckpt
+  - ${oc.env:LWM_CKPT_DIR}/22.37.20_lwm_v8_d2048_L8_lr=6e-5_with_new_configs_large/best.ckpt
+  - ${oc.env:LWM_CKPT_DIR}/LWM-200M_d1024_L16/best.ckpt
+  - ${oc.env:LWM_CKPT_DIR}/22.37.25_lwm_v8_d2048_L8_lr=6e-5_with_new_configs_huge/best.ckpt
+
+
+model_names:
+  - "d512-L8 / 110k"
+  - "d1024-L8 / 110k"
+  - "d1024-L16 / 110k"
+  - "d2048-L8 / 110k"
+  - "d1024-L16 / 220k"
+  - "d2048-L8 / 220k"
+
+
+
+# Dataset paths for scanning test episodes
+expert_dataset_path: ${oc.env:LWM_EXPERT_DATA_DIR}  # extracted expert episodes (HF lwm-expert-data)
+rollout_dataset_path: ${oc.env:LWM_INTERACTION_DATA_DIR}  # extracted interaction episodes (HF lwm-interaction-data)
+
+num_expert_plots: 1       # Number of expert test episodes to plot (0 = disable)
+num_new_config_plots: 1   # Number of interaction (new_config) test episodes to plot (0 = disable)
+max_steps: 100          # Maximum steps to rollout per episode
+
+# Average error vs step evaluation (full-episode rollouts from t=0)
+compute_avg_error_vs_step: true
+num_episodes_for_avg_error: 200  # null = use all test 200, or set a limit
+
+# Windowed N-step evaluation (random starting points, real GT state)
+compute_windowed_eval: true
+windowed_eval_steps: 6           # Number of autoregressive steps per window
+windows_per_episode: 10           # Number of random starting points per episode
+num_episodes_for_windowed: 200   # Max episodes per generalization category
+
+# Phase-based evaluation (reach / grasp / pull)
+compute_phase_eval: true
+phase_eval_steps: 16                 # Window length (H) per phase
+phase_proximity_threshold_cm: 5.0     # EE-affordance distance to define "near"
+phase_pull_movement_threshold_cm: 1.0 # Min affordance displacement to count as pull
+num_episodes_for_phase_eval: 0      # Max episodes per generalization category
+
+test_intersection: true
+include_shared_val_new_config: true  # Also eval on new_config episodes in val set of ALL models
+use_cache: true
+seed: ${oc.decode:${oc.env:LWM_EVAL_SEED,42}}  # window seed; the paper averages 42, 1 and 2
+device: "cuda"
+output_dir: ${oc.env:LWM_OUTPUT_DIR,outputs}/lwm_eval/model_size_ablation_large_seed${oc.env:LWM_EVAL_SEED,42}

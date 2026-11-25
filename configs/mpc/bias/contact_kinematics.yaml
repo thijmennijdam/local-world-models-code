@@ -1,0 +1,6 @@
+# @package mpc
+# Inductive biases for MPC rollouts: contact gate (affordance moves only when the gripper is
+# near and closed) and kinematic agent state (forward kinematics instead of the predicted state).
+affordance_proximity_gate_scale: 0.04
+finger_close_threshold: 0.01
+use_gt_agent_state: true

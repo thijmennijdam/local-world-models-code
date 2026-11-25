@@ -1,0 +1,80 @@
+# Training runs: the paper's world models (LWM-200M, LWM-100M) and a 26M example.
+# configs/lwm/REPRODUCTION.md lists the evidence for every setting of the paper models.
+# scripts/train_lwm.sh <run name> turns one entry (defaults + run overrides) into the
+# environment variables that lwm.world_model.train reads; ${VAR} values are expanded
+# from the environment. Values are parsed with yaml.safe_load (YAML 1.1), exactly as in
+# the original launcher, so e.g. 6e-5 and 0.5e5 stay strings until the trainer parses them.
+
+defaults:
+  expert_dataset_path: ${LWM_EXPERT_DATA_DIR}
+  rollout_dataset_path: ${LWM_INTERACTION_DATA_DIR}
+  gpus: 2
+  n_obs_steps: 1
+  include_object_ids_expert_replay: ["45526", "35059", "46092", "45166", "44853", "44817", "45092", "45132"]
+  allowed_goal_percentages_door_expert_replay: [0.04, 0.08, 0.16, 0.20, 0.28, 0.32, 0.40]
+  allowed_goal_percentages_drawer_expert_replay: [0.08, 0.16, 0.32, 0.40, 0.56, 0.64, 0.80]
+  include_object_ids_new_config: ["45526", "35059", "46092", "45166", "44853", "44817", "45092", "45132"]
+  horizon: 6
+  batch_size: 512          # per GPU
+  num_epochs: 500
+  weight_decay: 0.01
+  predict_agent_state: true
+  # The settings below did not exist (or were not passed) when the paper models were
+  # trained; these values reproduce what they effectively used. See REPRODUCTION.md.
+  skip_rotation_normalization: false
+  balanced_sampling: false
+  n_heads: 4
+
+configs:
+  # LWM-200M: d=1024, L=16, ~204M params (Table C.2, "huge" interaction data)
+  - name: "LWM-200M_d1024_L16"
+    d_model: 1024
+    n_layers: 16
+    learning_rate: 6e-5
+    lr_warmup_steps: 500
+    data_splits:
+      expert:
+        enabled: true
+        step_budget: 0.5e5
+      new_config:
+        enabled: true
+        step_budget: 2.2e5
+      replay:
+        enabled: false
+        step_budget: 0
+
+  # LWM-100M: d=1024, L=8, ~103M params (Table C.2, "large" interaction data)
+  - name: "LWM-100M_d1024_L8"
+    d_model: 1024
+    n_layers: 8
+    learning_rate: 1e-4
+    lr_warmup_steps: 100
+    weight_decay: 1e-3
+    data_splits:
+      expert:
+        enabled: true
+        step_budget: 0.5e5
+      new_config:
+        enabled: true
+        step_budget: 1.1e5
+      replay:
+        enabled: false
+        step_budget: 0
+
+  # --- 26M examples (same recipe and data as LWM-200M, d_model 512, lr 1e-3) ---
+  # LWM-26M_E0_base: the paper's recipe and data at 26M parameters (d_model 512, 8 layers, lr 1e-3).
+  - name: "LWM-26M_E0_base"
+    d_model: 512
+    n_layers: 8
+    learning_rate: 1e-3
+    lr_warmup_steps: 100
+    data_splits:
+      expert:
+        enabled: true
+        step_budget: 0.5e5
+      new_config:
+        enabled: true
+        step_budget: 2.2e5
+      replay:
+        enabled: false
+        step_budget: 0

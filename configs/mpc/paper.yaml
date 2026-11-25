@@ -1,0 +1,53 @@
+# Planner settings used for the paper's MPC table (Table 1).
+# Composes planner.yaml and overrides it with the values the paper runs passed on the
+# command line. Pick the inductive biases with bias=<none|contact|kinematics|contact_kinematics>.
+#
+#   python -m lwm.planning.run_mpc --config-name paper bias=contact_kinematics \
+#       checkpoint_path=... task.object_id=... task.task_config_file=... task.init_state_file=... \
+#       execution.seed=<episode index>
+#
+# The paper runs used 50 start states per object (the first states of interaction sessions), goal
+# 0.4 (doors) / 0.8 (drawers); configs/mpc/table1/ holds them with the execution.seed of each run.
+defaults:
+  - planner
+  - bias: contact_kinematics
+  - _self_
+
+mpc:
+  planner_type: icem
+  horizon: 12
+  num_samples: 256
+  wm_batch_size: 256
+  num_iterations: 3
+  temperature: 0.1
+  elite_fraction: 0.1
+  alpha: 0.25
+  elites_keep_fraction: 0.5
+  noise_beta: 3.0
+  history_length: 3
+  history_elite_frac: 0.3
+  warmup_iters: 5
+  online_iters: 3
+
+cost:
+  cost_type: dual
+  ee_aff_weight: 2.0
+  aff_goal_weight: 1.0
+  terminal_weight: 5.0
+  pull_threshold: 1
+  clip_affordance: true
+  grip_cost_weight: 0.0
+  proximity_scale: 0.0
+  progress_weight: 15.0
+  grip_enabled: false
+  grip_hover_threshold: 0.03
+  grip_warmup_steps: 5
+  grip_close_value: -0.04
+
+execution:
+  num_replanning_steps: 100
+  goal_tolerance: 0.02
+
+logging:
+  visualize: true
+  save_trajectories: true

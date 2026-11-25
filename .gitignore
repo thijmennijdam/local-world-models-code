@@ -1,0 +1,20 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+.pytest_cache/
+
+# data, checkpoints and run outputs
+/data/
+/checkpoints/
+/outputs/
+wandb/
+*.ckpt
+*.zarr
+eval_final_results/
+mpc_results/
+/figures/
+*.pdf
+!assets/*

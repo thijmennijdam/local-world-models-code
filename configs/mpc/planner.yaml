@@ -1,0 +1,124 @@
+# MPC Planning Configuration
+# Hydra config for MPC planning with trained World Models
+
+defaults:
+  - _self_
+
+# World Model checkpoint
+checkpoint_path: ???  # Required: path to trained WM checkpoint (.pth file)
+
+# Task configuration
+task:
+  object_id: "44817"
+  goal_percentage: 0.4  # Target joint angle directly (rad for doors, m for drawers)
+                         # Clamped to max_goal (doors: 0.4 rad, drawers: 0.8 m)
+
+  # Environment setup
+  task_config_file: ???  # Required: path to task_config.yaml from generated data
+  solution_path: "lwm.sim"  # Python package path for env (legacy value "manipulation" is mapped to lwm.sim)
+  task_name: "sim"  # Module name within solution_path (default: "sim")
+  init_state_file: null  # Optional: path to initial state .pkl file
+  num_points: 512  # Number of points in part point cloud
+
+  # Action space (must match RobogenPointCloudWrapper: pos_delta(3), orient_6d(6), finger(1) = 10D)
+  # Bounds derived from WM training data statistics (mean ± ~5x actual variation).
+  # CRITICAL: rot6d dims 0,4 (indices 3,7) have mean ~1.0 (identity rotation diagonal),
+  # so their bounds must be centered around 1.0, NOT 0.0!
+  action_dim: 10
+  action_bounds_source: checkpoint  # "checkpoint" (stored action_min/max, else the bounds below) or "config" (always the bounds below)
+  action_bounds:
+    #         pos_dx   pos_dy   pos_dz   rot6d_0  rot6d_1  rot6d_2  rot6d_3  rot6d_4  rot6d_5  finger
+    low:  [  -0.02,   -0.02,   -0.02,     0.85,   -0.15,   -0.08,   -0.15,     0.85,   -0.08,  -0.01]
+    high: [   0.02,    0.02,    0.02,     1.15,    0.15,    0.08,    0.15,     1.15,    0.08,   0.01]
+
+# MPC parameters
+mpc:
+  planner_type: cem  # "mppi", "cem", or "icem"
+  horizon: 12  # Planning horizon (number of steps)
+  num_samples: 1024  # Number of trajectory samples per iteration
+  num_iterations: 3  # Optimization iterations per planning step
+  wm_batch_size: null  # Max samples per WM forward pass (null = all at once, set e.g. 256 to chunk)
+  affordance_proximity_gate_scale: 0.04  # Zero out WM affordance deltas when EE is farther than this (meters, null=disabled).
+  finger_close_threshold: 0.01           # Zero out WM affordance deltas when finger state > this (meters, null=disabled).
+                                          # finger_state: 0=closed, 0.04=open. 0.02 = at least half closed.
+  cumulative_agent_state_delta: true  # Compose each predicted agent-state delta onto the chunk's input state (the training target is s_{t+k+1} - s_t); false = compose it onto the previous predicted state
+  use_gt_agent_state: false  # Use forward kinematics (action as state delta) instead of WM agent state prediction.
+
+  # Action noise (per-dimension standard deviation), 10D: [pos(3), orient_6d(6), finger(1)]
+  # Set to ~2-3x the training data std per dimension (exploration around mean).
+  # Training data std: pos~0.003, rot_offdiag~0.01-0.02, rot_diag~tiny, finger~0.003
+  #                pos_dx pos_dy pos_dz rot6d_0 rot6d_1 rot6d_2 rot6d_3 rot6d_4 rot6d_5 finger
+  noise_sigma: [0.005, 0.005, 0.005, 0.02, 0.03, 0.015, 0.03, 0.02, 0.015, 0.005]
+
+  # MPPI-specific
+  temperature: 0.1  # Temperature for cost-weighted averaging (lower = greedier)
+
+  # CEM-specific (also used by iCEM)
+  elite_fraction: 0.1  # Fraction of samples to keep as elites
+  alpha: 0.25  # Smoothing between old and new distribution (0=keep old, 1=fully new)
+
+  # iCEM-specific
+  elites_keep_fraction: 0.5  # Fraction of elites to carry between iterations
+  noise_beta: 3.0  # Colored noise exponent (0=white, 3=pink/smooth)
+  history_length: 3  # Number of best solutions to keep across plan calls
+  history_elite_frac: 0.3  # Fraction of population to fill with historical elites
+  warmup_iters: 5  # Optimization iterations on first plan call
+  online_iters: 3  # Optimization iterations on subsequent calls
+  execute_best: true  # Execute the lowest-cost evaluated sequence (false = the smoothed mean sequence)
+  noise_correlate_time: true  # Colored noise correlated over the horizon (false = across action dimensions)
+
+# Cost function
+cost:
+  cost_type: dual  # "dual" (original penalty-only) or "progress" (proximity-gated bonus)
+
+  # Shared
+  ee_aff_weight: 5.0    # Weight for EE→affordance distance
+  aff_goal_weight: 1.0   # Weight for affordance→goal distance (penalty in dual, tiebreaker in progress)
+  terminal_weight: 5.0   # Extra weight on final step (aff→goal in dual, gated progress in progress)
+  clip_affordance: true  # Clip predicted affordance movement to not exceed EE movement
+
+  # Proximity-gated grip bonus: reward closing gripper when near handle (works with any cost_type)
+  grip_cost_weight: 0.0    # Bonus weight for closing gripper near handle (0 = disabled)
+  proximity_scale: 0.04    # Gaussian gate width (meters); ~1 at contact, ~0 beyond 2x this
+
+  # Progress-mode only (ignored when cost_type=dual)
+  progress_weight: 15.0   # Weight for proximity-gated progress bonus
+
+  # Gripper schedule: after hovering near handle, ramp finger action toward close
+  grip_enabled: false        # Enable/disable grip schedule (hardcoded override)
+  grip_hover_threshold: 0.03 # EE-to-aff distance (m) to count as "hovering"
+  grip_warmup_steps: 5       # Steps of hovering before gripper is fully closed
+  grip_close_value: -0.01    # Finger action value for fully closed
+  grip_open_value: 0.04      # Finger action value for fully open; used at episode start
+
+  # Other
+  pull_threshold: 1   # EE→aff distance (m) at which planner resets (NOT used in cost)
+  affordance_offset: [0.0, 0.0, 0.0]  # [x, y, z] displacement applied to affordance point (world frame, meters)
+
+# Execution parameters
+execution:
+  num_replanning_steps: 50  # Maximum number of MPC iterations
+  goal_tolerance: 0.02  # Goal reached threshold (meters)
+  device: cuda  # "cuda" or "cpu"
+  seed: null  # Random seed (null = no seeding, int = deterministic)
+
+# Logging and output
+logging:
+  output_dir: ${oc.env:LWM_OUTPUT_DIR,outputs}/mpc_results  # Output directory
+  save_trajectories: true  # Save trajectory data as pickle
+  visualize: true  # Generate trajectory plots
+
+  # Weights & Biases (unused by run_mpc; kept for config compatibility)
+  wandb:
+    enabled: false
+    project: mpc_planning
+    entity: null
+    name: ${task.object_id}_goal${task.goal_percentage}
+
+# Hydra output directory configuration
+hydra:
+  run:
+    dir: ${logging.output_dir}/${task.object_id}_goal${task.goal_percentage}/${now:%Y.%m.%d_%H.%M.%S}
+  sweep:
+    dir: ${logging.output_dir}/sweeps/${now:%Y.%m.%d_%H.%M.%S}
+    subdir: ${hydra.job.num}

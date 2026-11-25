@@ -1,0 +1,17 @@
+# Paper Fig. 4 (model scale): error at step 6 vs Transformer size; stars = 2x interaction data.
+# Model names are the model_names entries of configs/lwm/eval/model_size_ablation_large.yaml.
+title: "6-step prediction error"
+xlabel: "Parameters"
+out: figures/lwm_arch_combined.pdf
+star_label: "2$\\times$ interaction data"
+eval_dirs:
+  - outputs/lwm_eval/model_size_ablation_large_seed42
+  - outputs/lwm_eval/model_size_ablation_large_seed1
+  - outputs/lwm_eval/model_size_ablation_large_seed2
+points:
+  - {x: "26M",  series: line, model: "d512-L8 / 110k"}
+  - {x: "103M", series: line, model: "d1024-L8 / 110k"}
+  - {x: "204M", series: line, model: "d1024-L16 / 110k"}
+  - {x: "412M", series: line, model: "d2048-L8 / 110k"}
+  - {x: "204M", series: star, model: "d1024-L16 / 220k"}
+  - {x: "412M", series: star, model: "d2048-L8 / 220k"}

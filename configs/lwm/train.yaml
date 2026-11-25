@@ -1,0 +1,121 @@
+# LWM-v8 (Local World Model v8) training configuration.
+# Most values are overridden by environment variables set by scripts/train_lwm.sh
+# (see configs/lwm/runs.yaml for the paper models).
+# Based on v3 Transformer architecture, predicting 9-DoF rigid body transform
+# computed from part point cloud correspondences via SVD (Kabsch algorithm).
+#
+# Prediction target: [rot_6d(6), translation(3)] = 9D per step
+# rot_6d: first two columns of rotation matrix (Zhou et al. 2019 continuous representation)
+# translation: 3D translation vector
+# Uses same v3 model with affordance_output_dim=9
+
+defaults:
+  - _self_
+
+name: train_lwm_v8
+
+# Model architecture parameters — same as v3 but affordance_output_dim=9
+model:
+  _target_: lwm.world_model.model.LWMv3
+  agent_state_dim: 10
+  action_dim: 10
+  predict_agent_state: false
+  n_future_steps: 1  # Designed for horizon=1 (autoregressive rollouts)
+  affordance_output_dim: 9  # 9-DoF: rot_6d(6) + translation(3)
+  # Transformer architecture
+  d_model: 128
+  n_heads: 4
+  n_layers: 3
+  dropout: 0.1
+  # Point cloud encoder
+  pointcloud_encoder_size: 256
+  use_pointnet2: false
+  # Point-cloud tokens: 1 = one global PointNet token (paper models); K > 1 = K local
+  # patch tokens (farthest-point-sampled centres, pcd_group_size nearest neighbours each)
+  pcd_tokens: 1
+  pcd_group_size: 32
+  # Contact prediction: "none", "bce" (auxiliary BCE head), or "gumbel_gate" (affordance gating)
+  predict_contact: none
+  gumbel_tau: 0.5
+
+# Training parameters
+training:
+  horizon: 1
+  batch_size: 400
+  num_epochs: 300
+  learning_rate: 1e-3
+  lr_warmup_steps: 100
+  lr_scheduler_type: cosine
+  lr_scheduler_kwargs:
+    step_size: 30
+    gamma: 0.1
+  max_grad_norm: 1.0
+  use_amp: true
+  weight_decay: 0.01
+  affordance_loss_weight: 1.0
+  horizon_weight_decay: none
+  use_pcd_transform_target: true  # Enable 9-DoF SVD-based target computation
+  skip_rotation_normalization: false  # If true, leave 6D rotation components unnormalized (mean=0, std=1)
+  # Contact prediction training params
+  predict_contact: none        # "none", "bce", or "gumbel_gate"
+  contact_loss_weight: 1.0     # Weight for contact BCE loss
+  contact_threshold: 1e-4      # Affordance delta threshold for contact label
+
+# Dataset parameters
+dataset:
+  pad_before: 0
+  pad_after: 0
+  seed: 42
+  val_ratio: 0.1
+  train_ratio: 0.9
+  is_pickle: true
+  balanced_sampling: false  # Sample expert & interaction data equally
+  # --- Experiment switches (defaults = the paper models; see lwm.world_model.targets) ---
+  # Frame of the 9-D part-motion target: world (rotation about the world origin) or
+  # centroid (rotation about the part centroid, translation = centroid displacement).
+  affordance_target_frame: world
+  # Model input frame: world, or handle (point cloud and EE position relative to the
+  # affordance point; requires affordance_target_frame=centroid).
+  input_frame: world
+  # Training-only scene augmentation: yaw about the vertical axis through the affordance
+  # point, U(-augment_yaw, augment_yaw) degrees, and an xy shift U(-t, t) metres (no z).
+  augment_yaw: 0
+  augment_translation: 0
+
+# DataLoader parameters
+dataloader:
+  batch_size: ${training.batch_size}
+  num_workers: 8
+  shuffle: true
+  pin_memory: true
+  persistent_workers: true
+
+val_dataloader:
+  batch_size: ${training.batch_size}
+  num_workers: 8
+  shuffle: false
+  pin_memory: true
+  persistent_workers: true
+
+# Experiment configuration
+exp_name: lwm_v8_training
+# Weights & Biases logging is off unless WANDB_MODE=online (or offline) is set.
+wandb:
+  project: ${oc.env:WANDB_PROJECT,actual_wm_training}
+  entity: ${oc.env:WANDB_ENTITY,null}
+  name: ${exp_name}
+
+# Checkpoint configuration
+checkpoint:
+  save_every: 100
+  save_best: true
+
+# Hydra output configuration
+hydra:
+  job:
+    override_dirname: ${name}
+  run:
+    dir: ${oc.env:CHECKPOINT_BASE_DIR,./checkpoints}/${exp_name}/${now:%Y.%m.%d}/${now:%H.%M.%S}_${oc.env:EXP_NAME,${name}}
+  sweep:
+    dir: ${oc.env:CHECKPOINT_BASE_DIR,./checkpoints}/${exp_name}/${now:%Y.%m.%d}/${now:%H.%M.%S}_${oc.env:EXP_NAME,${name}}
+    subdir: ${hydra.job.num}

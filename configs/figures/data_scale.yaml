@@ -1,0 +1,23 @@
+# Paper Fig. 5 (data scale, 200M model): error at step 6 vs interaction-data budget; stars = the
+# affordance-only ablation (no end-effector head). Model names are the model_names entries of
+# configs/lwm/eval/pointnet_data_ablations.yaml and no_agent_state.yaml.
+title: "6-step prediction error"
+xlabel: "Interaction data steps"
+out: figures/lwm_data_ablation.pdf
+star_label: "Affordance-only ablation"
+eval_dirs:
+  - outputs/lwm_eval/pointnet_data_ablations_seed42
+  - outputs/lwm_eval/pointnet_data_ablations_seed1
+  - outputs/lwm_eval/pointnet_data_ablations_seed2
+  - outputs/lwm_eval/no_agent_state_seed42
+  - outputs/lwm_eval/no_agent_state_seed1
+  - outputs/lwm_eval/no_agent_state_seed2
+points:
+  - {x: "Expert", series: line, model: "d1024-L16 / 50k"}
+  - {x: "30k",    series: line, model: "d1024-L16 / 30k"}
+  - {x: "70k",    series: line, model: "d1024-L16 / 70k"}
+  - {x: "110k",   series: line, model: "d1024-L16 / 110k"}
+  - {x: "220k",   series: line, model: "d1024-L16 / 220k"}
+  - {x: "70k",    series: star, model: "d1024-L16 (no agent state) / 70k"}
+  - {x: "110k",   series: star, model: "d1024-L16 (no agent state) / 110k"}
+  - {x: "220k",   series: star, model: "d1024-L16 (no agent state) / 220k"}
